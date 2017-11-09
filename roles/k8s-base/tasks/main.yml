@@ -1,0 +1,70 @@
+---
+
+- name: get info
+  setup:
+  register: res
+
+- name: only for Centos
+  fail: msg="Sorry,the system is not support"
+  when: res.ansible_facts.ansible_distribution != "CentOS"
+
+- name: set 163 repo
+  get_url: url=http://mirrors.163.com/.help/CentOS{{ res.ansible_facts.ansible_distribution_major_version }}-Base-163.repo dest=/etc/yum.repos.d/CentOS-Base.repo force=yes
+
+- name: update kernel
+  yum: name=kernel* state=latest
+
+- name: disable iptables
+  service: name=firewalld state=stopped enabled=no
+
+- name: copy /etc/hosts 
+  template: src=hosts.j2 dest=/etc/hosts
+
+- name: remove old packages
+  yum: name={{ item }} state=removed
+  with_items:
+    - docker
+    - docker-common
+    - container-selinux
+    - docker-selinux
+    - docker-engine
+
+- name: install required packages
+  yum: name={{ item }} state=latest
+  with_items:
+    - yum-utils
+    - device-mapper-persistent-data
+    - lvm2
+
+- name: set docker-ce.repo
+  shell: yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+- name: install docker-ce-17.03.2
+  shell:  yum install -y --setopt=obsoletes=0 docker-ce-17.03.1.ce-1.el7.centos docker-ce-selinux-17.03.1.ce-1.el7.centos
+
+- name: start docker service
+  service: name=docker state=restarted enabled=yes
+
+- name: add docker group
+  shell: usermod -aG docker {{ ansible_user }}
+
+- name: set sysctl.conf
+  sysctl: name={{ item }} value=1 reload=yes
+  with_items:
+    - net.ipv4.ip_forward
+    - net.bridge.bridge-nf-call-ip6tables
+    - net.bridge.bridge-nf-call-iptables
+
+- name: get hostname
+  shell: hostname
+  register: info
+
+- name: download cfssl tools
+  get_url: url={{ CFSSL_URL }}/cfssl_linux-amd64 dest=/usr/local/bin/cfssl mode=755
+  #when: info['stdout'] == "k8s-master"
+
+- name: download cfssljson tools
+  get_url: url={{ CFSSL_URL }}/cfssljson_linux-amd64 dest=/usr/local/bin/cfssljson mode=755
+  #when: info['stdout'] == "k8s-master"
+
+

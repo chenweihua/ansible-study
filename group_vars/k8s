@@ -1,0 +1,7 @@
+# set hostname
+master: k8s-master
+node1: k8s-node1
+node2: k8s-node2
+
+# set CFSSL
+CFSSL_URL: https://pkg.cfssl.org/R1.2
